@@ -49,7 +49,7 @@ async function postNextItem() {
   try {
     await bot.sendPhoto(channelId, post.imageUrl, {
       caption: post.text,
-      parse_mode: 'HTML' // Changed to HTML
+      parse_mode: 'HTML' // Changed to HTML5
     });
     sent = true;
     console.log(`Posted item ${currentIndex + 1}: ${post.text.substring(0, 50)}...`);
