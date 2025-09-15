@@ -1,71 +1,54 @@
-require('dotenv').config();
-const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
-const data = require('./data.json');
+// api/post.js (or index.js depending on your structure)
+import { Redis } from "@upstash/redis";
+import TelegramBot from "node-telegram-bot-api";
+import data from "../../data.json";
 
-const app = express();
-app.use(express.json());
-
-const token = process.env.BOT_TOKEN;
-const channelId = process.env.CHANNEL_ID;
-const bot = new TelegramBot(token, { polling: false });
-
-const CRON_SECRET = process.env.CRON_SECRET || 'your-secret-key';
-
-app.get('/post', async (req, res) => {
-  try {
-    await postNextItem();
-    res.json({ success: true, message: 'Posted!' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
+// Redis client
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL,
+  token: process.env.UPSTASH_REDIS_TOKEN,
 });
 
-app.post('/api/cron', (req, res) => {
-  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+// Telegram bot
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
+
+export default async function handler(req, res) {
+  const CRON_SECRET = process.env.CRON_SECRET;
+
+  if (req.method === "POST") {
+    if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      // Get current index from Redis (default 0)
+      let currentIndex = await redis.get("currentIndex");
+      currentIndex = parseInt(currentIndex || "0");
+
+      if (currentIndex >= data.length) {
+        return res.json({ success: false, message: "All posts done!" });
+      }
+
+      const post = data[currentIndex];
+
+      // Send to Telegram
+      await bot.sendPhoto(process.env.CHANNEL_ID, post.imageUrl, {
+        caption: post.text,
+        parse_mode: "HTML",
+      });
+
+      // Update counter
+      await redis.set("currentIndex", currentIndex + 1);
+
+      return res.json({
+        success: true,
+        message: `Posted item ${currentIndex + 1}`,
+      });
+    } catch (err) {
+      console.error("Post failed:", err);
+      return res.status(500).json({ error: err.message });
+    }
   }
-  postNextItem()
-    .then(() => res.json({ success: true }))
-    .catch(err => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-});
 
-let currentIndex = parseInt(fs.readFileSync('index.txt', 'utf8') || '0');
-
-async function postNextItem() {
-  if (currentIndex >= data.length) {
-    console.log('All posts done!');
-    return;
-  }
-
-  const post = data[currentIndex];
-  let sent = false;
-
-  try {
-    await bot.sendPhoto(channelId, post.imageUrl, {
-      caption: post.text,
-      parse_mode: 'HTML' // Changed to HTML5
-    });
-    sent = true;
-    console.log(`Posted item ${currentIndex + 1}: ${post.text.substring(0, 50)}...`);
-  } catch (error) {
-    console.error('Post failed:', error);
-  }
-
-  if (sent) {
-    currentIndex++;
-    fs.writeFileSync('index.txt', currentIndex.toString());
-  }
-}
-
-module.exports = app;
-
-if (require.main === module) {
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => console.log(`Server running on port ${port}`));
+  res.status(405).json({ error: "Method not allowed" });
 }
