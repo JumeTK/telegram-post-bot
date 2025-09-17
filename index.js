@@ -1,8 +1,13 @@
 import express from "express";
 import { Redis } from "@upstash/redis";
 import TelegramBot from "node-telegram-bot-api";
-import data from "./data.json" assert { type: "json" };
+//import data from "./data.json" assert { type: "json" };
+import fs from "fs";
+import path from "path";
 
+const data = JSON.parse(
+  fs.readFileSync(path.resolve("./data.json"), "utf-8")
+);
 const app = express();
 app.use(express.json());
 
