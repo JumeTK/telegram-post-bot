@@ -1,13 +1,9 @@
-import express from "express";
+	mport express from "express";
 import { Redis } from "@upstash/redis";
 import TelegramBot from "node-telegram-bot-api";
-//import data from "./data.json" assert { type: "json" };
 import fs from "fs";
 import path from "path";
 
-const data = JSON.parse(
-  fs.readFileSync(path.resolve("./data.json"), "utf-8")
-);
 const app = express();
 app.use(express.json());
 
@@ -20,12 +16,18 @@ const redis = new Redis({
 // Telegram bot
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
 
+// Load posts data from JSON
+const data = JSON.parse(fs.readFileSync(path.resolve("./data.json"), "utf-8"));
+
+// Secret key for external cron authorization
 const CRON_SECRET = process.env.CRON_SECRET;
 
-/**
- * POST /post
- * Sends the next item to Telegram
- */
+// GET / → optional, for testing in browser
+app.get("/", (req, res) => {
+  res.send("Telegram bot is running. Use POST /post with cron secret.");
+});
+
+// POST /post → triggered by cron job
 app.post("/post", async (req, res) => {
   if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
