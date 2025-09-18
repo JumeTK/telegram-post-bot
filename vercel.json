@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "functions": {
-    "api/post.js": {
-      "runtime": "@vercel/node@2.21.1"
-    }
-  }
+  "builds": [
+    { "src": "api/post.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/post", "dest": "api/post.js" }
+  ]
 }
