@@ -2,3 +2,4 @@ node_modules/
 .env
 index.txt
 .DS_Store
+.vercel
